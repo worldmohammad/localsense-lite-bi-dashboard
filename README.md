@@ -10,7 +10,7 @@ LocalSense BI is a powerful, drag-and-drop Business Intelligence dashboard that 
 
 Try the demo instantly—no signup, no installation:
 
-👉 **[Launch Live Demo](https://digitalyar.company/product/spa13-datawave-pro/)**
+👉 **[Launch Live Demo](https://digitalyar.company/product/spa16-localsense-bi/)**
 
 > ⚠️ Demo limited to 200 rows and 3 charts. Upgrade for unlimited access.
 
@@ -50,7 +50,6 @@ Try the demo instantly—no signup, no installation:
 - **Chart.js** — Interactive charts
 - **PapaParse** — CSV parsing
 - **SheetJS (xlsx)** — Excel parsing & export
-- **Dexie.js** — IndexedDB wrapper (Pro version)
 
 ---
 
