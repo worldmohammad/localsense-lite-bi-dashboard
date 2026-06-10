@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>LocalSense BI Demo | Business Intelligence Dashboard</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } }
+    }
+  </script>
+  
+  <link href="https://cdn.jsdelivr.net/npm/gridstack@8.2.1/dist/gridstack.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@8.2.1/dist/gridstack-all.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    body {
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    /* ========== DEMO WATERMARKS ========== */
+    body::before {
+      content: 'DEMO VERSION - Limited to 200 Rows';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-35deg);
+      font-size: 4vw;
+      color: rgba(239, 68, 68, 0.12);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 9998;
+      font-weight: 900;
+      user-select: none;
+      letter-spacing: 6px;
+    }
+    body::after {
+      content: 'Upgrade at digitalyar.company';
+      position: fixed;
+      top: 25%;
+      left: 15%;
+      transform: rotate(20deg);
+      font-size: 2.5vw;
+      color: rgba(37, 99, 235, 0.08);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 9997;
+      font-weight: 700;
+      user-select: none;
+    }
+
+    /* ========== PRO LOCK BADGE ========== */
+    .pro-badge {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: not-allowed;
+    }
+
+    .dashboard-card {
+      border-radius: 1rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      background: inherit;
+    }
+    .dark .dashboard-card { background-color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .light .dashboard-card { background-color: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    
+    .grid-stack-item-content {
+      background-color: transparent !important;
+      display: flex;
+      flex-direction: column;
+    }
+    .chart-wrapper { position: relative; flex: 1 1 auto; height: 100%; width: 100%; }
+    
+    .slicer-scroll::-webkit-scrollbar { width: 6px; }
+    .slicer-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+    .dark .slicer-scroll::-webkit-scrollbar-thumb { background-color: #475569; }
+
+    .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500; transition: all 0.2s; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;}
+    .btn-primary { background-color: #3b82f6; color: white; }
+    .btn-primary:hover { background-color: #2563eb; }
+    .btn-secondary { background-color: #64748b; color: white; }
+    .btn-success { background-color: #10b981; color: white; }
+    .btn-excel { background-color: #16a34a; color: white; }
+    .btn-png { background-color: #0ea5e9; color: white; }
+    .btn-pro { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; opacity: 0.7; cursor: not-allowed; }
+    .btn-pro:hover { opacity: 0.85; }
+    
+    #loadingIndicator { display: none; text-align: center; padding: 2rem; font-size: 1.2rem; }
+  </style>
+</head>
+<body class="dark:bg-slate-900 light:bg-slate-100 min-h-screen antialiased flex flex-col">
+
+<!-- Upgrade Banner -->
+<div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-center py-2 px-4 text-sm font-semibold">
+  ⚠️ <strong>DEMO MODE:</strong> Max 200 rows, 3 charts only. 
+  <a href="https://digitalyar.company/product/spa16-localsense-bi/" target="_blank" class="underline font-bold hover:no-underline">Upgrade to Full Version →</a>
+</div>
+
+<header class="dashboard-card rounded-none border-b dark:border-slate-800 p-4 sticky top-0 z-40">
+  <div class="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30">LS</div>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">LocalSense BI <span class="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full align-middle ml-1">DEMO</span></h1>
+        <p class="text-xs opacity-70">Local Business Intelligence Dashboard — Demo Version</p>
+      </div>
+    </div>
+    <div class="flex gap-2 flex-wrap items-center text-sm">
+      <button id="themeToggle" class="btn bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 hover:opacity-80">🌓 Theme</button>
+      <button id="manageFieldsBtn" class="btn bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 hover:opacity-80 hidden">⚙️ Manage Fields</button>
+      <button id="clearDataBtn" class="btn bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-200 hover:opacity-80 hidden">🗑️ Clear</button>
+      <button id="exportExcelBtn" class="btn btn-pro hidden" title="Pro Feature">📊 Excel <span class="pro-badge">PRO</span></button>
+      <button id="exportPngBtn" class="btn btn-pro hidden" title="Pro Feature">🖼️ PNG <span class="pro-badge">PRO</span></button>
+      <button id="exportPdfBtn" class="btn btn-pro hidden" title="Pro Feature">📄 PDF <span class="pro-badge">PRO</span></button>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 max-w-[1400px] w-full mx-auto px-4 py-6 flex flex-col md:flex-row gap-6 items-start">
+  
+  <aside id="sidebarSlicers" class="hidden w-full md:w-64 flex-shrink-0 dashboard-card p-4 sticky top-24 max-h-[85vh] overflow-y-auto slicer-scroll">
+    <div class="flex justify-between items-center mb-4 border-b dark:border-slate-700 pb-2">
+      <h2 class="font-bold text-lg">🎯 Filters (Slicers)</h2>
+      <span id="filteredCountBadge" class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full font-bold"></span>
+    </div>
+    <div id="slicersContainer" class="space-y-3"></div>
+  </aside>
+
+  <div class="flex-1 w-full flex flex-col gap-6">
+    
+    <div id="dropZone" class="border-2 border-dashed border-slate-400 dark:border-slate-600 hover:border-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 bg-slate-50 dark:bg-slate-800/50 p-12 rounded-2xl text-center transition-all cursor-pointer">
+      <div class="flex flex-col items-center gap-3">
+        <span class="text-6xl mb-2 opacity-80">📊</span>
+        <p class="text-2xl font-bold">Drop your CSV, JSON, or Excel file here</p>
+        <p class="text-sm opacity-70 max-w-md mx-auto">100% offline. Demo limited to <strong>200 rows</strong> and <strong>3 charts</strong>.</p>
+        <input type="file" id="fileInput" accept=".csv,.json,.xlsx,.xls" class="hidden">
+      </div>
+    </div>
+
+    <div id="loadingIndicator">
+      <span class="inline-block animate-spin text-2xl mr-2">⏳</span>
+      <span>Processing data...</span>
+    </div>
+
+    <div id="kpiSection" class="hidden flex flex-col gap-3">
+      <div class="flex items-center gap-2 bg-slate-200 dark:bg-slate-800 p-2 rounded-lg w-fit">
+        <span class="font-bold text-sm">Calculate KPIs for column:</span>
+        <select id="kpiColSelect" class="bg-white dark:bg-slate-700 border-none rounded px-3 py-1 text-sm font-bold text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"></select>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="dashboard-card p-5 border-t-4 border-blue-500">
+          <p class="text-sm opacity-70">Total Sum</p>
+          <h3 id="kpiSum" class="text-2xl font-bold tracking-tight">0</h3>
+        </div>
+        <div class="dashboard-card p-5 border-t-4 border-emerald-500">
+          <p class="text-sm opacity-70">Average</p>
+          <h3 id="kpiAvg" class="text-2xl font-bold tracking-tight">0</h3>
+        </div>
+        <div class="dashboard-card p-5 border-t-4 border-purple-500">
+          <p class="text-sm opacity-70">Maximum</p>
+          <h3 id="kpiMax" class="text-2xl font-bold tracking-tight">0</h3>
+        </div>
+        <div class="dashboard-card p-5 border-t-4 border-rose-500">
+          <p class="text-sm opacity-70">Record Count</p>
+          <h3 id="kpiCount" class="text-2xl font-bold tracking-tight">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div id="chartBuilderSection" class="hidden dashboard-card p-5 border-l-4 border-indigo-500">
+      <div class="flex flex-wrap gap-4 items-end">
+        <div class="min-w-[150px]">
+          <label class="block text-xs mb-1 opacity-80 font-bold">Chart Type</label>
+          <select id="chartTypeSelect" class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+            <option value="line">📈 Line</option>
+            <option value="bar">📊 Bar</option>
+            <option value="pie">🥧 Pie</option>
+            <option value="doughnut">🍩 Doughnut</option>
+            <option value="polarArea">🎯 Polar Area</option>
+            <option value="radar">🕸️ Radar</option>
+            <option value="scatter">✨ Scatter</option>
+          </select>
+        </div>
+        <div class="min-w-[150px]">
+          <label class="block text-xs mb-1 opacity-80 font-bold">X Axis (Category)</label>
+          <select id="xAxisSelect" class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 cursor-pointer"></select>
+        </div>
+        <div class="min-w-[150px]">
+          <label class="block text-xs mb-1 opacity-80 font-bold">Y Axis (Numeric)</label>
+          <select id="yAxisSelect" class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 cursor-pointer"></select>
+        </div>
+        <div class="flex gap-2 flex-1 min-w-[250px]">
+          <button id="addCustomChartBtn" class="btn btn-primary flex-1 shadow-md shadow-blue-500/20">➕ Add Chart</button>
+          <button id="autoRecommendBtn" class="btn btn-secondary shadow-md">✨ Auto Dashboard</button>
+        </div>
+      </div>
+      <p class="text-xs text-amber-600 dark:text-amber-400 mt-3 font-semibold">⚠️ Demo limit: 3 charts maximum. <a href="https://digitalyar.company/product/spa16-localsense-bi/" target="_blank" class="underline">Upgrade for unlimited charts.</a></p>
+    </div>
+
+    <div id="dashboardArea" class="hidden pb-10">
+      <div class="grid-stack"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="border-t dark:border-slate-800 py-6 mt-auto text-center">
+  <p class="text-sm opacity-70">
+    Designed and developed by 
+    <a href="https://www.digitalyar.company" target="_blank" class="font-bold text-blue-600 dark:text-blue-400 hover:underline">DigitalYar Company</a>
+    — <a href="https://digitalyar.company/product/spa16-localsense-bi/" target="_blank" class="text-amber-500 hover:underline font-semibold">Upgrade to Full Version</a>
+  </p>
+</footer>
+
+<script>
+  (function() {
+    // ========== DEMO RESTRICTIONS ==========
+    const DEMO_MAX_ROWS = 200;
+    const DEMO_MAX_CHARTS = 3;
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const loadingEl = document.getElementById('loadingIndicator');
+    const sidebarSlicers = document.getElementById('sidebarSlicers');
+    const slicersContainer = document.getElementById('slicersContainer');
+    const kpiSection = document.getElementById('kpiSection');
+    const chartBuilderSection = document.getElementById('chartBuilderSection');
+    const dashboardArea = document.getElementById('dashboardArea');
+    
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const exportPngBtn = document.getElementById('exportPngBtn');
+    const clearDataBtn = document.getElementById('clearDataBtn');
+    const manageFieldsBtn = document.getElementById('manageFieldsBtn');
+    
+    const kpiColSelect = document.getElementById('kpiColSelect');
+    const chartTypeSelect = document.getElementById('chartTypeSelect');
+    const xSelect = document.getElementById('xAxisSelect');
+    const ySelect = document.getElementById('yAxisSelect');
+    
+    let originalData = [];    
+    let filteredData = [];    
+    let currentColumns = [];  
+    let currentTypes = {};    
+    let activeFilters = {};   
+    let chartConfigs = [];    
+    let grid;                 
+    
+    const TYPE_OPTIONS = ['Text', 'Number', 'Boolean', 'Email', 'Mobile Number', '10-Digit/National ID', 'Jalali Date', 'Gregorian Date'];
+
+    function showProAlert(feature) {
+      alert(`🔒 ${feature} is a Pro feature.\n\nUpgrade to the full version at digitalyar.company to unlock all features including unlimited rows, unlimited charts, Excel/PNG/PDF export, and more.`);
+    }
+
+    function initGridStack() {
+      if(!grid) {
+        grid = GridStack.init({
+          cellHeight: 120,
+          margin: 12,
+          rtl: false,
+          animate: true,
+          disableOneColumnMode: false 
+        });
+      }
+    }
+
+    // Theme
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      if(isDark) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      }
+      updateAllChartsTheme();
+    });
+    
+    if(localStorage.getItem('theme') === 'light') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+
+    function getChartTextColor() {
+      return document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#334155';
+    }
+    function getGridColor() {
+      return document.documentElement.classList.contains('dark') ? '#334155' : '#e2e8f0';
+    }
+    
+    function updateAllChartsTheme() {
+      const color = getChartTextColor();
+      const gridColor = getGridColor();
+      chartConfigs.forEach(c => {
+        if(c.instance) {
+          if(c.instance.options.plugins.legend) c.instance.options.plugins.legend.labels.color = color;
+          if(c.instance.options.scales) {
+            if (c.instance.options.scales.x) { c.instance.options.scales.x.ticks.color = color; c.instance.options.scales.x.grid.color = gridColor; }
+            if (c.instance.options.scales.y) { c.instance.options.scales.y.ticks.color = color; c.instance.options.scales.y.grid.color = gridColor; }
+            if (c.instance.options.scales.r) { c.instance.options.scales.r.ticks.color = color; c.instance.options.scales.r.grid.color = gridColor; c.instance.options.scales.r.pointLabels.color = color; }
+          }
+          c.instance.update();
+        }
+      });
+    }
+
+    function detectType(values) {
+      const sample = values.filter(v => v !== null && v !== undefined && v !== '').slice(0, 50);
+      if (!sample.length) return 'Text';
+      if (sample.every(v => ['true','false','yes','no','0','1'].includes(String(v).trim().toLowerCase()))) return 'Boolean';
+      if (sample.every(v => !isNaN(String(v).replace(/[,\s]/g, '')) && String(v).trim() !== '')) return 'Number';
+      if (sample.every(v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v)))) return 'Email';
+      if (sample.every(v => /^1[34]\d{2}[\/\-]\d{2}[\/\-]\d{2}$/.test(String(v)))) return 'Jalali Date';
+      if (sample.every(v => /^\d{4}[\/\-]\d{2}[\/\-]\d{2}$/.test(String(v)))) return 'Gregorian Date';
+      if (sample.every(v => /^(\+98|0)?9\d{9}$/.test(String(v).replace(/[\s\-()]/g, '')))) return 'Mobile Number';
+      if (sample.every(v => /^\d{10}$/.test(String(v).trim()))) return '10-Digit/National ID';
+      return 'Text';
+    }
+
+    function detectAllTypes(data, columns) {
+      const types = {};
+      columns.forEach(col => { types[col] = detectType(data.map(row => row[col])); });
+      return types;
+    }
+
+    function generateSlicers() {
+      slicersContainer.innerHTML = '';
+      activeFilters = {};
+      const slicerCols = currentColumns.filter(c => currentTypes[c] !== 'Number' && currentTypes[c] !== 'Email' && currentTypes[c] !== 'Mobile Number');
+      
+      slicerCols.forEach(col => {
+        const uniqueValues = [...new Set(originalData.map(r => String(r[col]).trim()).filter(Boolean))].sort();
+        if (uniqueValues.length > 0 && uniqueValues.length <= 30) {
+          const detailsEl = document.createElement('details');
+          detailsEl.className = 'group bg-slate-100 dark:bg-slate-800 rounded-lg p-2';
+          detailsEl.open = true;
+          let html = `<summary class="font-bold text-sm cursor-pointer list-none flex justify-between items-center opacity-90 hover:opacity-100">${col}<span class="text-xs transition-transform group-open:rotate-180 bg-slate-200 dark:bg-slate-700 w-5 h-5 flex items-center justify-center rounded-full">▼</span></summary><div class="mt-3 space-y-1 max-h-40 overflow-y-auto slicer-scroll pr-1">`;
+          uniqueValues.forEach(val => {
+            html += `<label class="flex items-center gap-2 text-xs cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 p-1.5 rounded transition-colors"><input type="checkbox" class="slicer-cb form-checkbox h-3.5 w-3.5 text-blue-600 rounded cursor-pointer" data-col="${col}" value="${val}"><span class="truncate">${val}</span></label>`;
+          });
+          html += `</div>`;
+          detailsEl.innerHTML = html;
+          slicersContainer.appendChild(detailsEl);
+        }
+      });
+      document.querySelectorAll('.slicer-cb').forEach(cb => cb.addEventListener('change', applyFilters));
+      sidebarSlicers.classList.remove('hidden');
+    }
+
+    function applyFilters() {
+      activeFilters = {};
+      document.querySelectorAll('.slicer-cb:checked').forEach(cb => {
+        const col = cb.getAttribute('data-col');
+        const val = cb.value;
+        if(!activeFilters[col]) activeFilters[col] = [];
+        activeFilters[col].push(val);
+      });
+      if(Object.keys(activeFilters).length === 0) { filteredData = [...originalData]; }
+      else { filteredData = originalData.filter(row => Object.entries(activeFilters).every(([col, allowedValues]) => allowedValues.includes(String(row[col]).trim()))); }
+      document.getElementById('filteredCountBadge').innerText = `${filteredData.length.toLocaleString('en-US')} records`;
+      updateKPIs();
+      updateAllChartsData();
+    }
+
+    function setupKPIs() {
+      const numCols = currentColumns.filter(c => currentTypes[c] === 'Number');
+      if (numCols.length === 0) { kpiSection.classList.add('hidden'); return; }
+      kpiColSelect.innerHTML = numCols.map(c => `<option value="${c}">${c}</option>`).join('');
+      kpiColSelect.addEventListener('change', updateKPIs);
+      kpiSection.classList.remove('hidden');
+      updateKPIs();
+    }
+
+    function updateKPIs() {
+      const targetCol = kpiColSelect.value;
+      if(!targetCol) return;
+      const values = filteredData.map(r => parseFloat(String(r[targetCol]).replace(/[,\s]/g, ''))).filter(v => !isNaN(v));
+      let sum = 0, max = 0, avg = 0;
+      if (values.length > 0) { sum = values.reduce((a, b) => a + b, 0); max = Math.max(...values); avg = sum / values.length; }
+      const formatNum = (num) => Number(num.toFixed(2)).toLocaleString('en-US');
+      document.getElementById('kpiSum').innerText = formatNum(sum);
+      document.getElementById('kpiAvg').innerText = formatNum(avg);
+      document.getElementById('kpiMax').innerText = formatNum(max);
+      document.getElementById('kpiCount').innerText = filteredData.length.toLocaleString('en-US');
+    }
+
+    function populateChartSelects() {
+      const numCols = currentColumns.filter(c => currentTypes[c] === 'Number');
+      xSelect.innerHTML = currentColumns.map(c => `<option value="${c}">${c}</option>`).join('');
+      ySelect.innerHTML = (numCols.length > 0 ? numCols : currentColumns).map(c => `<option value="${c}">${c}</option>`).join('');
+      chartBuilderSection.classList.remove('hidden');
+      manageFieldsBtn.classList.remove('hidden');
+      clearDataBtn.classList.remove('hidden');
+    }
+
+    function aggregateData(data, xCol, yCol) {
+      const result = {};
+      data.forEach(row => {
+        const xVal = String(row[xCol] || 'Unspecified').trim();
+        const yVal = parseFloat(String(row[yCol]).replace(/[,\s]/g, '')) || 0;
+        result[xVal] = (result[xVal] || 0) + yVal;
+      });
+      const sortedKeys = Object.keys(result).sort((a, b) => result[b] - result[a]).slice(0, 50);
+      return { labels: sortedKeys, data: sortedKeys.map(k => result[k]) };
+    }
+
+    function getChartDataForType(type, xCol, yCol) {
+      if (type === 'scatter') {
+        const scatterData = filteredData.map(row => ({ x: parseFloat(String(row[xCol]).replace(/[,\s]/g, '')) || 0, y: parseFloat(String(row[yCol]).replace(/[,\s]/g, '')) || 0 }));
+        return { labels: [], datasets: [{ label: `${yCol} vs ${xCol}`, data: scatterData, backgroundColor: 'rgba(59,130,246,0.6)', borderColor: 'rgba(59,130,246,1)', pointRadius: 5, pointHoverRadius: 7 }] };
+      } else {
+        const agg = aggregateData(filteredData, xCol, yCol);
+        const isMultiColor = ['pie', 'doughnut', 'polarArea'].includes(type);
+        return { labels: agg.labels, datasets: [{ label: `Total ${yCol}`, data: agg.data, backgroundColor: isMultiColor ? ['#3b82f6','#8b5cf6','#ec4899','#f97316','#10b981','#eab308','#06b6d4','#64748b'] : (['line', 'radar'].includes(type) ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.8)'), borderColor: isMultiColor ? (document.documentElement.classList.contains('dark') ? '#1e293b' : '#fff') : '#3b82f6', borderWidth: isMultiColor ? 2 : 1, borderRadius: type === 'bar' ? 4 : 0, fill: ['line', 'radar'].includes(type), tension: type === 'line' ? 0.4 : 0 }] };
+      }
+    }
+
+    function createGridChart(type, xCol, yCol, title, w = 6, h = 3) {
+      if (chartConfigs.length >= DEMO_MAX_CHARTS) {
+        return alert(`⚠️ Demo limit reached: Maximum ${DEMO_MAX_CHARTS} charts allowed.\n\nUpgrade to the full version for unlimited charts.`);
+      }
+      if (!grid) initGridStack();
+      if (!xCol || !yCol) return alert('Please select X and Y axis columns.');
+
+      const canvasId = 'chart-' + Date.now();
+      const widgetHtml = `<div class="dashboard-card w-full h-full p-4 flex flex-col border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl shadow-sm"><div class="flex justify-between items-center mb-3 cursor-move grid-stack-item-draggable drag-handle"><h3 class="font-bold text-sm truncate pr-2 border-l-4 border-blue-500 pl-2">${title}</h3><button class="remove-btn text-slate-400 hover:text-rose-500 font-bold px-1 transition-colors text-xl leading-none" title="Remove">&times;</button></div><div class="chart-wrapper"><canvas id="${canvasId}"></canvas></div></div>`;
+
+      dashboardArea.classList.remove('hidden');
+      dropZone.classList.add('hidden'); 
+      const el = grid.addWidget({ w, h, content: widgetHtml });
+
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      const textColor = getChartTextColor();
+      const gridColor = getGridColor();
+      const chartData = getChartDataForType(type, xCol, yCol);
+      const isRadial = ['pie', 'doughnut', 'polarArea', 'radar'].includes(type);
+
+      let scalesConfig = {};
+      if (!isRadial) {
+        scalesConfig = { x: { ticks: { color: textColor }, grid: { color: gridColor, drawBorder: false }, type: type === 'scatter' ? 'linear' : 'category', position: 'bottom' }, y: { ticks: { color: textColor }, grid: { color: gridColor, drawBorder: false } } };
+      } else if (type === 'radar' || type === 'polarArea') {
+        scalesConfig = { r: { ticks: { color: textColor, backdropColor: 'transparent' }, grid: { color: gridColor }, pointLabels: { color: textColor } } };
+      }
+
+      const config = { type: type, data: chartData, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: isRadial, position: 'right', labels: { color: textColor } } }, scales: scalesConfig } };
+      const chartInstance = new Chart(ctx, config);
+      const chartCfg = { id: canvasId, type, xCol, yCol, instance: chartInstance, el };
+      chartConfigs.push(chartCfg);
+
+      el.querySelector('.remove-btn').addEventListener('click', () => {
+        chartInstance.destroy();
+        grid.removeWidget(el);
+        chartConfigs = chartConfigs.filter(c => c.id !== canvasId);
+      });
+    }
+
+    function updateAllChartsData() {
+      chartConfigs.forEach(cfg => {
+        const newData = getChartDataForType(cfg.type, cfg.xCol, cfg.yCol);
+        cfg.instance.data.labels = newData.labels;
+        cfg.instance.data.datasets = newData.datasets;
+        cfg.instance.update();
+      });
+    }
+
+    function generateAutoDashboard() {
+      grid.removeAll();
+      chartConfigs.forEach(c => c.instance.destroy());
+      chartConfigs = [];
+      
+      const numCols = currentColumns.filter(c => currentTypes[c] === 'Number');
+      const catCols = currentColumns.filter(c => currentTypes[c] !== 'Number' && currentTypes[c] !== 'Email' && currentTypes[c] !== 'Mobile Number');
+
+      if(numCols.length === 0 || catCols.length === 0) {
+        alert('For auto-generating the dashboard, at least one numeric column and one category column are needed.');
+        return;
+      }
+
+      createGridChart('bar', catCols[0], numCols[0], `Total ${numCols[0]} by ${catCols[0]}`, 8, 4);
+      
+      if (chartConfigs.length < DEMO_MAX_CHARTS) {
+        if (catCols.length > 1) {
+          createGridChart('polarArea', catCols[1], numCols[0], `Distribution of ${catCols[1]}`, 4, 4);
+        } else {
+          createGridChart('doughnut', catCols[0], numCols[0], `Ratio of ${catCols[0]}`, 4, 4);
+        }
+      }
+      
+      if (chartConfigs.length < DEMO_MAX_CHARTS) {
+        const dateCols = currentColumns.filter(c => currentTypes[c] === 'Jalali Date' || currentTypes[c] === 'Gregorian Date');
+        if (dateCols.length > 0) {
+          createGridChart('line', dateCols[0], numCols[0], `Trend of ${numCols[0]}`, 12, 4);
+        } else if(numCols.length > 1) {
+          createGridChart('scatter', numCols[0], numCols[1], `Scatter: ${numCols[1]} vs ${numCols[0]}`, 12, 4);
+        } else {
+          createGridChart('line', catCols[0], numCols[0], `Linear Trend`, 12, 4);
+        }
+      }
+    }
+
+    function parseFile(file) {
+      loadingEl.style.display = 'block';
+      dropZone.classList.add('hidden');
+      const extension = file.name.split('.').pop().toLowerCase();
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        try {
+          if (extension === 'csv') {
+            Papa.parse(e.target.result, { header: true, skipEmptyLines: true, complete: function(results) { handleParsedData(results.data); } });
+          } else if (extension === 'json') {
+            handleParsedData(JSON.parse(e.target.result));
+          } else if (['xlsx', 'xls'].includes(extension)) {
+            const workbook = XLSX.read(e.target.result, { type: 'binary' });
+            handleParsedData(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]));
+          }
+        } catch (err) {
+          alert('Error processing file: ' + err.message);
+          loadingEl.style.display = 'none';
+          dropZone.classList.remove('hidden');
+        }
+      };
+      
+      if (['xlsx', 'xls'].includes(extension)) reader.readAsBinaryString(file);
+      else reader.readAsText(file, 'UTF-8');
+    }
+
+    function handleParsedData(data) {
+      if (!data || !data.length) return alert('No data found');
+      
+      originalData = data.filter(row => Object.values(row).some(v => v !== '' && v != null));
+      
+      // DEMO ROW LIMIT
+      if (originalData.length > DEMO_MAX_ROWS) {
+        alert(`⚠️ Demo limited to ${DEMO_MAX_ROWS} rows. Your file has ${originalData.length} rows. Only the first ${DEMO_MAX_ROWS} will be loaded.\n\nUpgrade at digitalyar.company for unlimited rows.`);
+        originalData = originalData.slice(0, DEMO_MAX_ROWS);
+      }
+      
+      filteredData = [...originalData];
+      currentColumns = Object.keys(originalData[0] || {});
+      currentTypes = detectAllTypes(originalData, currentColumns);
+      
+      document.getElementById('filteredCountBadge').innerText = `${originalData.length.toLocaleString('en-US')} records`;
+      
+      initGridStack();
+      generateSlicers();
+      setupKPIs();
+      populateChartSelects();
+      generateAutoDashboard();
+      
+      loadingEl.style.display = 'none';
+    }
+
+    // Pro feature alerts
+    exportExcelBtn.addEventListener('click', () => showProAlert('Excel Export'));
+    exportPngBtn.addEventListener('click', () => showProAlert('PNG Export'));
+    exportPdfBtn.addEventListener('click', () => showProAlert('PDF Export'));
+
+    clearDataBtn.addEventListener('click', () => {
+      if(confirm('Are you sure you want to clear the dashboard?')) {
+        originalData = []; filteredData = []; chartConfigs = [];
+        if(grid) grid.removeAll();
+        sidebarSlicers.classList.add('hidden');
+        kpiSection.classList.add('hidden');
+        chartBuilderSection.classList.add('hidden');
+        dashboardArea.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+        manageFieldsBtn.classList.add('hidden');
+        clearDataBtn.classList.add('hidden');
+      }
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) parseFile(e.target.files[0]); });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+      if (e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById('addCustomChartBtn').addEventListener('click', () => {
+      createGridChart(chartTypeSelect.value, xSelect.value, ySelect.value, `Custom Chart ${ySelect.value}`, 6, 4);
+    });
+    document.getElementById('autoRecommendBtn').addEventListener('click', generateAutoDashboard);
+
+    // Disable right-click save
+    document.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      alert('⛔ This is a demo version. Saving is not allowed. Please visit digitalyar.company to purchase the full version.');
+    });
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey && e.key === 's') || (e.ctrlKey && e.key === 'u') || (e.ctrlKey && e.shiftKey && e.key === 'i') || e.key === 'F12') {
+        e.preventDefault();
+        return false;
+      }
+    });
+
+  })();
+</script>
+</body>
+</html>
